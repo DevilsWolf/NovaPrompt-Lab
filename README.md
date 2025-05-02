@@ -9,7 +9,6 @@ NovaPrompt Lab provides a user-friendly interface to manage, test, and execute p
 
 ---
 
-**[Insert Screenshot Here]**
 
 *![Screenshot_149](https://github.com/user-attachments/assets/71f964d5-d091-42dc-bb52-78e8b12ba9a5)*
 
