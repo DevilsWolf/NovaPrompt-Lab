@@ -1,6 +1,5 @@
-# app.py - Updated with Full Guide Integration
+# app.py - Main Application Logic (Refactored, Workflow Execution, Verified Fixes)
 
-# --- Keep all imports ---
 import sys
 import requests # Used only for model fetching now
 import json
@@ -9,6 +8,7 @@ import urllib.parse
 import traceback
 import re
 
+# --- Qt Imports ---
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QVBoxLayout, QHBoxLayout, QTextEdit,
                              QPushButton, QListWidget, QSplitter, QLabel,
@@ -17,18 +17,18 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QDoubleSpinBox, QSpinBox,
                              QGroupBox, QScrollArea, QTabWidget,
                              QInputDialog, QAbstractItemView, QDialog,
-                             QDialogButtonBox, QDockWidget) # Add Dialog imports
+                             QDialogButtonBox, QDockWidget ) # Add Dialog imports
 from PyQt6 import QtCore
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer, QSize
 from PyQt6.QtGui import QIcon, QTextCursor, QAction, QKeySequence
-# --- End Imports ---
 
+# --- Local Imports ---
 try:
     from database import DatabaseManager
-    from ui import Ui_MainWindow
-    from workers import WorkerThread, WorkflowRunner, VARIABLE_PATTERN
+    from ui import Ui_MainWindow # UI setup class
+    from workers import WorkerThread, WorkflowRunner, VARIABLE_PATTERN # Worker threads & Regex
 except ImportError as e:
-    print(f"CRITICAL ERROR: Missing required file ({e.name}).") # ... (rest of error handling) ...
+    print(f"CRITICAL ERROR: Missing required file ({e.name}). Make sure database.py, ui.py, and workers.py are present.")
     app_temp = QApplication.instance();
     if not app_temp:
         app_temp = QApplication(sys.argv)
@@ -40,21 +40,21 @@ except ImportError as e:
     sys.exit(1)
 
 
-# --- Constants and Config (Same) ---
-LM_STUDIO_API_BASE_URL = "http://localhost:1234/v1";
-DEFAULT_MODEL_FALLBACK = "No models loaded/found";
-DEFAULT_TEMPERATURE = 0.7;
-DEFAULT_MAX_TOKENS = 1024;
+# --- Constants and Config ---
+LM_STUDIO_API_BASE_URL = "http://localhost:1234/v1"
+DEFAULT_MODEL_FALLBACK = "No models loaded/found"
+DEFAULT_TEMPERATURE = 0.7
+DEFAULT_MAX_TOKENS = 1024
 VARIABLE_UPDATE_DEBOUNCE_MS = 350
 
-# --- WorkflowInputDialog Class (Keep As Is) ---
+# --- Input Dialog for Workflow ---
 class WorkflowInputDialog(QDialog):
-    # ... (Keep the full class definition from the previous step) ...
+    """Dialog to get initial variable values for a workflow."""
     def __init__(self, required_vars: list[str], parent=None):
         super().__init__(parent);
         self.setWindowTitle("Workflow Input Required");
         self.setMinimumWidth(400);
-        self.setWindowModality(Qt.WindowModality.WindowModal);
+        self.setWindowModality(Qt.WindowModality.WindowModal)
         self.layout = QVBoxLayout(self);
         self.form_layout = QFormLayout();
         self.input_widgets: dict[str, QLineEdit] = {}
@@ -68,14 +68,14 @@ class WorkflowInputDialog(QDialog):
                 line_edit.setPlaceholderText(f"Value for {{{var_name}}}...");
                 self.input_widgets[var_name] = line_edit;
                 self.form_layout.addRow(f"{var_name}:", line_edit)
-        self.layout.addLayout(self.form_layout)
+            self.layout.addLayout(self.form_layout)
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel);
         self.button_box.accepted.connect(self.accept);
         self.button_box.rejected.connect(self.reject);
         self.layout.addWidget(self.button_box)
         if self.input_widgets:
             first_widget = next(iter(self.input_widgets.values()));
-            QTimer.singleShot(0, first_widget.setFocus)
+            QTimer.singleShot(0, first_widget.setFocus) # Focus first input
     def get_values(self) -> dict[str, str] | None:
         values = {};
         missing = [];
@@ -90,14 +90,16 @@ class WorkflowInputDialog(QDialog):
             return None
         return values
 
-# --- MainWindow Class ---
+# --- Main Application Window ---
 class MainWindow(QMainWindow):
-    # --- __init__ (Same) ---
+    """Main application window for NovaPrompt Lab - Handles logic and state."""
+
     def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent);
+        """Initializes the main window, UI, database, and state."""
+        super().__init__(parent)
         print("--- MainWindow __init__ started ---")
         self.setWindowTitle("NovaPrompt Lab");
-        self.setGeometry(100, 100, 1200, 850);
+        self.setGeometry(100, 100, 1200, 850)
         self.variable_inputs: dict[str, QLineEdit] = {};
         self.db_manager = DatabaseManager();
         self.progress_dialog: QProgressDialog | None = None;
@@ -112,8 +114,8 @@ class MainWindow(QMainWindow):
         self.current_workflow_id: int | None = None;
         self.current_workflow_steps: list[int] = []
         self.ui = Ui_MainWindow();
-        self.ui.setup_ui(self)
-        self._create_workflow_log_dock() # Create dock before connecting signals potentially using it
+        self.ui.setup_ui(self) # Setup UI from ui.py
+        self._create_workflow_log_dock()
         self._connect_signals();
         self._populate_category_filter();
         self._load_prompts_list();
@@ -123,8 +125,9 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, self._set_initial_splitter_sizes)
         print("--- MainWindow __init__ finished ---")
 
-    # --- UI Setup Helpers (Referencing self.ui for widgets) ---
-    def _create_workflow_log_dock(self): # Creates dock widget
+    # --- UI Setup Helpers ---
+    def _create_workflow_log_dock(self):
+        """Creates the dock widget for logging workflow progress."""
         self.workflow_log_dock = QDockWidget("Workflow Log", self);
         self.workflow_log_dock.setObjectName("WorkflowLogDock");
         self.workflow_log_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
@@ -135,13 +138,13 @@ class MainWindow(QMainWindow):
         self.workflow_log_dock.setWidget(self.workflow_log_output);
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.workflow_log_dock);
         self.workflow_log_dock.setVisible(False)
-        view_menu = None; # Add toggle action to View menu
+        view_menu = None; # Add toggle action to View menu (created in ui.py)
         for action in self.ui.menu_bar.actions(): # Access menu bar via self.ui
             if action.text() == "&View":
                 view_menu = action.menu();
                 break
         if not view_menu:
-            view_menu = self.ui.menu_bar.addMenu("&View")
+            view_menu = self.ui.menu_bar.addMenu("&View") # Create if needed
         toggle_log_action = self.workflow_log_dock.toggleViewAction();
         toggle_log_action.setText("Workflow &Log");
         toggle_log_action.setStatusTip("Show/Hide Workflow Log");
@@ -165,8 +168,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Warning: Splitter size failed: {e}")
 
-    # --- Signal Connections (Add connection for Full Guide) --- <<< MODIFIED >>>
+    # --- Signal Connections ---
     def _connect_signals(self):
+        """Connects UI element signals to the appropriate handler methods."""
         print("--- _connect_signals started ---");
         # Access UI elements via self.ui.
         self.ui.category_filter_combo.currentIndexChanged.connect(self._filter_prompts_by_category);
@@ -193,29 +197,31 @@ class MainWindow(QMainWindow):
         self.ui.exit_action.triggered.connect(self.close);
         # Assuming ui.py has created help_menu and guide_action/full_guide_action
         if hasattr(self.ui, 'guide_action'):
-            self.ui.guide_action.triggered.connect(self._show_templating_guide_dialog) # Renamed slot
+            self.ui.guide_action.triggered.connect(self._show_templating_guide_dialog) # Template guide
         else:
             print("Warning: Could not find 'Templating Guide' menu action to connect.")
 
         if hasattr(self.ui, 'full_guide_action'):
-            self.ui.full_guide_action.triggered.connect(self._show_full_guide_dialog)
+            self.ui.full_guide_action.triggered.connect(self._show_full_guide_dialog) # Connect full guide action
         else:
-            print("Warning: Could not find 'Application Guide' menu action to connect.")
+            print("Warning: Could not find 'full_guide_action' on UI object.")
 
         print("--- _connect_signals finished ---")
 
-    # --- Slot Methods ---
-    # (Referencing self.ui for widgets)
+    # --- Slots and Action Handlers ---
+    # (Methods below handle application logic in response to signals)
 
     def _on_prompt_text_changed(self):
         self.variable_update_timer.start() # Debounce
-    def _perform_variable_update(self): # Clear & Rebuild variable inputs
+
+    def _perform_variable_update(self):
+        """(Debounced) Clears and rebuilds the variable input UI."""
         try:
             prompt_text = self.ui.prompt_editor.toPlainText();
             found_variables = sorted(list(set(VARIABLE_PATTERN.findall(prompt_text))));
             while self.ui.variables_form_layout.rowCount() > 0:
-                self.ui.variables_form_layout.removeRow(0)
-            self.variable_inputs.clear();
+                self.ui.variables_form_layout.removeRow(0) # Clear layout safely
+            self.variable_inputs.clear() # Clear tracking dict
             if found_variables:
                 for var_name in found_variables:
                     line_edit = QLineEdit();
@@ -224,7 +230,7 @@ class MainWindow(QMainWindow):
                     label = QLabel(f"{var_name}:");
                     self.variable_inputs[var_name] = line_edit;
                     self.ui.variables_form_layout.addRow(label, line_edit)
-            self.ui.variables_groupbox.setVisible(bool(found_variables))
+            self.ui.variables_groupbox.setVisible(bool(found_variables)) # Show/hide groupbox
         except Exception as e:
             print(f"CRITICAL ERROR variable UI update: {e}\n{traceback.format_exc()}")
 
@@ -283,7 +289,7 @@ class MainWindow(QMainWindow):
         self.ui.generated_output.moveCursor(QTextCursor.MoveOperation.End);
         self.ui.generated_output.insertPlainText(chunk)
 
-    def _generate_prompt(self): # Single prompt generation
+    def _generate_prompt(self):
         print("--- _generate_prompt ---");
         original_prompt_text = self.ui.prompt_editor.toPlainText();
         if not original_prompt_text.strip():
@@ -365,7 +371,6 @@ class MainWindow(QMainWindow):
         print("--- _handle_generation_result finished ---")
 
     def _cancel_generation(self):
-        """Requests cancellation of the running generation OR workflow thread."""
         print("--- _cancel_generation ---");
         cancelled_something = False
         if self.worker_thread and self.worker_thread.isRunning():
@@ -484,14 +489,14 @@ class MainWindow(QMainWindow):
             return
         prompt_id = item.data(QtCore.Qt.ItemDataRole.UserRole)
         if prompt_id is not None:
-            prompt_data = self.db_manager.get_prompt_by_id(prompt_id);
+            prompt_data = self.db_manager.get_prompt_by_id(prompt_id)
             if prompt_data:
                 _id, txt, cat, nts, crtd, out_var = prompt_data;
                 cat_s = cat if cat else "[Uncat.]";
-                nts_s = f"\n\nNotes:\n{nts.strip()}" if nts and ns.strip() else ""; # Fixed typo nts -> ns
-                txt_s = f"\n\nPrompt:\n{txt.strip()}";
-                ov_s = f"\nOutput Var: {{{out_var}}}" if out_var else "";
-                self.ui.prompt_preview.setPlainText(f"Cat: {cat_s}\nCreated: {crtd}{ov_s}{nts_s}{txt_s}")
+                nts_s = f"\n\nNotes:\n------\n{nts.strip()}" if nts and nts.strip() else ""; # Fixed typo in variable name
+                txt_s = f"\n\nPrompt Text:\n------------\n{txt.strip()}";
+                ov_s = f"\n\nOutput Variable: {{{out_var}}}" if out_var else "";
+                self.ui.prompt_preview.setPlainText(f"Category: {cat_s}\nCreated: {crtd}{ov_s}{nts_s}{txt_s}")
             else:
                 self.ui.prompt_preview.setPlainText(f"Error: Cannot retrieve ID {prompt_id}.");
                 self.statusBar().showMessage(f"Error retrieving ID: {prompt_id}", 5000)
@@ -608,7 +613,7 @@ class MainWindow(QMainWindow):
                     status_message = "Failed add.";
                     message_timeout = 5000;
                     QMessageBox.critical(self, "Save Failed", "Could not add.")
-            else: # Update existing
+            else:
                 if self.db_manager.update_prompt(self.current_prompt_id, prompt_text, category, notes, output_variable_name):
                     saved_prompt_id = self.current_prompt_id;
                     status_message = f"Prompt updated (ID: {self.current_prompt_id})";
@@ -661,9 +666,9 @@ class MainWindow(QMainWindow):
         event.accept();
         print("--- closeEvent finished ---")
 
-    def _show_templating_guide_dialog(self): # Renamed for clarity
+    def _show_templating_guide_dialog(self):
         self._show_guide_dialog("Prompt Templating Guide", "guide.html")
-    def _show_full_guide_dialog(self): # New method for full guide
+    def _show_full_guide_dialog(self):
         self._show_guide_dialog("NovaPrompt Lab - Full Guide", "full_guide.html")
     def _show_guide_dialog(self, title: str, guide_filename: str):
         """Displays a scrollable message box with content from an HTML file."""
@@ -691,7 +696,6 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(scroll, 1, 0, 1, grid_layout.columnCount(), Qt.AlignmentFlag.AlignCenter);
         msg_box.addButton(QMessageBox.StandardButton.Ok);
         msg_box.exec()
-
 
     # --- Workflow Management Slots ---
     def _load_workflows_list(self):
@@ -916,7 +920,6 @@ class MainWindow(QMainWindow):
         initial_variables = {}
         if initial_inputs_needed:
             print(f"Workflow requires initial inputs: {initial_inputs_needed}")
-            # Use the custom input dialog
             dialog = WorkflowInputDialog(initial_inputs_needed, self)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 values = dialog.get_values()
@@ -936,19 +939,16 @@ class MainWindow(QMainWindow):
         temperature = self.ui.temperature_spinbox.value();
         max_tokens = self.ui.max_tokens_spinbox.value()
 
-        # Clear output areas and show log dock
         self.ui.generated_output.clear();
         self.ui.generated_output.setPlaceholderText("Running workflow...")
         self.workflow_log_output.clear();
-        self.workflow_log_dock.setVisible(True)
+        self.workflow_log_dock.setVisible(True) # Show log dock
 
         self.statusBar().showMessage(f"Running workflow (Model: {selected_model})...", 0)
         self.ui.run_workflow_button.setEnabled(False);
         self.ui.generate_button.setEnabled(False)
-        QApplication.processEvents() # Update UI
+        QApplication.processEvents()
 
-        # Create and start WorkflowRunner thread
-        # Pass a copy of current_workflow_steps to avoid modification during execution
         self.workflow_runner = WorkflowRunner(
             workflow_steps=list(self.current_workflow_steps),
             initial_variables=initial_variables,
@@ -957,12 +957,11 @@ class MainWindow(QMainWindow):
             model_name=selected_model,
             temperature=temperature,
             max_tokens=max_tokens,
-            parent=self # Set parent for signal/slot connections
-        )
+            parent=self)
         self.workflow_runner.step_started.connect(self._handle_workflow_step_started);
         self.workflow_runner.step_finished.connect(self._handle_workflow_step_output);
         self.workflow_runner.workflow_complete.connect(self._handle_workflow_finished);
-        self.workflow_runner.error_occurred.connect(self._handle_workflow_error);
+        self.workflow_runner.error_occurred.connect(self._handle_workflow_error)
         self.workflow_runner.start();
         print("WorkflowRunner thread started.")
 
@@ -990,7 +989,7 @@ class MainWindow(QMainWindow):
             return None
 
     def _handle_workflow_step_started(self, step_index: int, description: str):
-        log_msg = f"--- Starting Step {step_index + 1}/{len(self.current_workflow_steps)} ---\n{description}\n"
+        log_msg = f"--- Starting Step {step_index + 1}/{len(self.current_workflow_steps)} ---\n{description}\n";
         print(log_msg.strip());
         self.workflow_log_output.append(log_msg);
         self.statusBar().showMessage(f"Running Step {step_index + 1}/{len(self.current_workflow_steps)}: {description}", 0)
@@ -1001,11 +1000,10 @@ class MainWindow(QMainWindow):
         print(f"  Output Text Snippet: {output_text[:80]}...") # Print snippet to console log
 
         log_msg = f"--- Step {step_index + 1} Finished ---\n";
-        if output_var_name != "[No Output Var]":
-            log_msg += f"Output Variable: {{{output_var_name}}}\n"
+        if output_var_name != "[N/A]":
+            log_msg += f"Output Variable: {{{output_var_name}}}\n" # Corrected "[No Output Var]" to "[N/A]" as used in workers.py
         log_msg += f"Output Text:\n{output_text}\n"; # Include the full output in the log
         self.workflow_log_output.append(log_msg)
-
 
     def _handle_workflow_finished(self, final_output: str, success: bool):
         """Handles workflow completion signal."""
@@ -1035,7 +1033,6 @@ class MainWindow(QMainWindow):
         self.workflow_runner = None; # Clear runner reference
         print("--- _handle_workflow_finished finished ---")
 
-
     def _handle_workflow_error(self, error_message: str):
         """Handles errors emitted specifically by the WorkflowRunner."""
         print(f"--- _handle_workflow_error ---: {error_message}");
@@ -1046,7 +1043,7 @@ class MainWindow(QMainWindow):
         # The finished signal will be emitted after this, which handles UI state cleanup.
 
 
-# --- Main application entry point ---
+# --- Main entry point ---
 def main():
     """Main function to start the NovaPrompt Lab application."""
     print("--- main function started ---")
