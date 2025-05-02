@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    /* Basic styling for readability in QTextEdit */
+    body { font-family: sans-serif; line-height: 1.4; color: #d4d4d4; background-color: #252526; padding: 5px; }
+    h2 { color: #528bff; margin-top: 1.5em; margin-bottom: 0.5em; border-bottom: 1px solid #4b5263; padding-bottom: 0.2em; }
+    h3 { margin-top: 1.2em; margin-bottom: 0.3em; color: #e5e9f0; }
+    h4 { margin-top: 1em; margin-bottom: 0.2em; color: #d8dee9; font-size: 1.05em; }
+    p, ul, ol { margin-bottom: 0.7em; }
+    li { margin-bottom: 0.4em; }
+    pre { background-color: #2c313a; border: 1px solid #4b5263; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; font-size: 9.5pt; }
+    code { font-family: "Consolas", "Monaco", "Fira Code", "Source Code Pro", monospace; }
+    b { color: #eceff4; font-weight: bold; }
+    i { color: #a3be8c; } /* Greenish emphasis */
+    kbd { background-color: #3a3d41; border: 1px solid #555555; padding: 1px 4px; border-radius: 2px; font-family: "Consolas", "Monaco", monospace; }
+    hr { border: none; border-top: 1px solid #4b5263; margin: 1.5em 0; }
+    .variable { color: #c678dd; font-weight: bold; } /* Purple for variables */
+    .filename { color: #98c379; font-style: italic; } /* Green for filenames */
+    .ui-element { color: #61afef; font-weight: bold; } /* Blue for UI elements */
+</style>
+</head>
+<body>
+
+<h2>NovaPrompt Lab User Guide</h2>
+
+<h3>Introduction</h3>
+<p>Welcome to NovaPrompt Lab! This tool helps you craft, test, save, and organize prompts for interacting with local Large Language Models (LLMs) via the LM Studio API. You can also chain prompts together into simple workflows.</p>
+
+<hr/>
+
+<h3>Main Interface Overview</h3>
+<p>The application window is divided into several key areas:</p>
+<ul>
+    <li><b>Menu Bar (Top):</b> Contains <kbd>File</kbd> (Exit) and <kbd>Help</kbd> (Guides) menus.</li>
+    <li><b>Left Panel (Tabs):</b>
+        <ul>
+            <li><b>Prompts Tab:</b> Manage your individual saved prompts. Contains filtering, searching, the prompt list, and a preview area.</li>
+            <li><b>Workflows Tab:</b> Define and manage sequences of prompts (workflows). Contains workflow list, step list, and controls.</li>
+        </ul>
+    </li>
+    <li><b>Right Area (Split View):</b>
+        <ul>
+            <li><b>Top Section (Editor Area):</b> Where you write and edit your prompts. Includes fields for <span class="ui-element">Category</span>, <span class="ui-element">Notes</span>, <span class="ui-element">Output Variable Name</span>, and the dynamic <span class="ui-element">Prompt Variables</span> section (if using templates).</li>
+            <li><b>Bottom Section (Output & Controls):</b> Displays the <span class="ui-element">Generated Output</span> from the LLM. Also contains controls for selecting the <span class="ui-element">Model</span>, setting <span class="ui-element">Temperature</span> and <span class="ui-element">Max Tokens</span>, and action buttons like <span class="ui-element">Generate Response</span> and <span class="ui-element">Copy Output to Editor</span>.</li>
+        </ul>
+    </li>
+    <li><b>Workflow Log (Dockable Panel):</b> Appears at the bottom when running workflows, showing step-by-step progress and intermediate outputs. Toggle visibility via the <kbd>View</kbd> menu.</li>
+    <li><b>Status Bar (Bottom):</b> Displays informational messages about application status and actions.</li>
+</ul>
+
+<hr/>
+
+<h3>Core Tasks</h3>
+
+<h4>1. Managing Prompts (Prompts Tab)</h4>
+<ul>
+    <li><b>Saving:** Type your prompt in the <span class="ui-element">Prompt Editor</span>. Optionally fill in <span class="ui-element">Category</span>, <span class="ui-element">Notes</span>, and (for workflows) <span class="ui-element">Output Variable Name</span>. Click <span class="ui-element">Save Prompt</span>. If it's a new prompt, it's added; if you loaded an existing prompt, it's updated.</li>
+    <li><b>Loading:** Select a prompt in the <span class="ui-element">Saved Prompts</span> list. Click <span class="ui-element">Load Selected</span>. The prompt text, category, notes, and output variable name will load into the editor section.</li>
+    <li><b>Deleting:** Select a prompt in the <span class="ui-element">Saved Prompts</span> list. Click <span class="ui-element">Delete Selected</span> and confirm.</li>
+    <li><b>Previewing:** Simply click on a prompt in the <span class="ui-element">Saved Prompts</span> list. Its details (including category, notes, output variable, and full text) will appear in the <span class="ui-element">Preview</span> area below the list.</li>
+    <li><b>Clearing:** Click <span class="ui-element">New / Clear Editor</span> to clear all editor fields, variable inputs, and the generated output, ready for a new prompt.</li>
+</ul>
+
+<h4>2. Finding Prompts (Prompts Tab)</h4>
+<ul>
+    <li><b>By Category:** Use the <span class="ui-element">Filter by Category</span> dropdown to show only prompts matching a specific category or "[Uncategorized]". Select "All Categories" to see everything.</li>
+    <li><b>By Keyword:** Type keywords into the <span class="ui-element">Search Prompts</span> field. The list will update automatically to show prompts where the keyword appears in the prompt text, category, or notes (case-insensitive).</li>
+    <li><b>Combined:** Use both the category filter and search field simultaneously for more specific results.</li>
+</ul>
+
+<h4>3. Generating a Single Response</h4>
+<ol>
+    <li>Ensure LM Studio is running with the desired model loaded and the API server started.</li>
+    <li>In NovaPrompt Lab, select the correct loaded model from the <span class="ui-element">Model</span> dropdown. Click <span class="ui-element">Refresh</span> if needed.</li>
+    <li>Write or load your prompt into the <span class="ui-element">Prompt Editor</span>.</li>
+    <li>If using a template with <span class="variable">{variables}</span>, fill in the values in the <span class="ui-element">Prompt Variables</span> section that appears.</li>
+    <li>Adjust <span class="ui-element">Temp</span> (Temperature, 0.0-2.0, higher is more creative) and <span class="ui-element">Max Tokens</span> (max response length) as needed.</li>
+    <li>Click <span class="ui-element">Generate Response</span>.</li>
+    <li>Output will stream into the <span class="ui-element">Generated Output</span> area. A progress dialog may briefly appear and can be used to cancel.</li>
+    <li>Use <span class="ui-element">Copy Output to Editor</span> to append the result back to your prompt editor for further refinement.</li>
+</ol>
+
+<h4>4. Using Prompt Templates (Variables)</h4>
+<ul>
+    <li><b>Syntax:** Define variables by enclosing a name in curly braces: <span class="variable">{variable_name}</span>. Use only letters, numbers, underscores.</li>
+    <li><b>Input:** When variables are detected in the <span class="ui-element">Prompt Editor</span>, the <span class="ui-element">Prompt Variables</span> section appears below it with input fields for each unique variable.</li>
+    <li><b>Substitution:** Fill in the values. When you click <span class="ui-element">Generate Response</span> (or run a workflow step), the app replaces the <span class="variable">{variable_name}</span> placeholders with the values you provided before sending the final text to the LLM.</li>
+    <li><b>Example Template:**
+        <pre><code>Explain the concept of {concept} in simple terms suitable for a {audience_level}. Focus on its main application in {context}.</code></pre>
+        <i>Variables Detected:</i> <span class="variable">{concept}</span>, <span class="variable">{audience_level}</span>, <span class="variable">{context}</span>
+    </li>
+</ul>
+
+<h4>5. Defining Workflows (Workflows Tab)</h4>
+<ol>
+    <li>Go to the <span class="ui-element">Workflows</span> tab.</li>
+    <li>Click <span class="ui-element">New</span>, enter a name (e.g., "Generate & Summarize Story Idea"), click OK. The new workflow appears selected in the <span class="ui-element">Workflows</span> list.</li>
+    <li>Go back to the <span class="ui-element">Prompts</span> tab. Find and save prompts intended as steps. **Crucially:** For steps whose output needs to be used later, fill in the <span class="ui-element">Output Variable Name</span> field when saving the prompt (e.g., `story_idea`).</li>
+    <li>Select the first prompt for your workflow in the <span class="ui-element">Saved Prompts</span> list (e.g., one that generates a story idea and has `story_idea` as its Output Variable Name).</li>
+    <li>Switch back to the <span class="ui-element">Workflows</span> tab. Ensure your workflow ("Generate & Summarize...") is selected.</li>
+    <li>Click <span class="ui-element">Add Prompt as Step</span>. The prompt appears in the <span class="ui-element">Workflow Steps</span> list.</li>
+    <li>Go back to the <span class="ui-element">Prompts</span> tab. Find and select the *next* prompt (e.g., one that contains the variable `{story_idea}` and maybe defines its own output like `story_summary`).</li>
+    <li>Switch back to the <span class="ui-element">Workflows</span> tab. Click <span class="ui-element">Add Prompt as Step</span> again.</li>
+    <li>Repeat adding steps as needed.</li>
+    <li>Use the <span class="ui-element">Up</span> / <span class="ui-element">Down</span> / <span class="ui-element">Remove Step</span> buttons to manage the sequence. Changes are saved automatically.</li>
+</ol>
+
+<h4>6. Running Workflows (Workflows Tab)</h4>
+<ol>
+    <li>Select the desired workflow in the <span class="ui-element">Workflows</span> list.</li>
+    <li>Ensure the correct <span class="ui-element">Model</span> is selected and <span class="ui-element">Parameters</span> are set in the bottom-right panel (these apply to all steps currently).</li>
+    <li>Click <span class="ui-element">Run Workflow</span>.</li>
+    <li>If the workflow requires initial inputs (variables used in steps that are *not* provided by a previous step's output variable), a dialog box will appear asking you to enter values. Fill them in and click OK.</li>
+    <li>The workflow will execute step-by-step. Progress and intermediate outputs appear in the <span class="ui-element">Workflow Log</span> panel (use <kbd>View -> Workflow Log</kbd> menu to show/hide it).</li>
+    <li>The final output from the *last* step appears in the main <span class="ui-element">Generated Output</span> area when the workflow finishes or fails.</li>
+</ol>
+
+<h4>Workflow Example Walkthrough</h4>
+<p>Let's create a 2-step workflow: Generate a topic, then write a tweet about it.</p>
+<ol>
+    <li><b>Save Prompts:</b>
+        <ul>
+            <li>Save Prompt 1: Text = <code>Generate a single, interesting science topic.</code>, Category = <code>WF-Step</code>, Output Variable Name = <code>science_topic</code></li>
+            <li>Save Prompt 2: Text = <code>Write a short, engaging tweet about {science_topic}. Include one relevant hashtag. Max 250 chars.</code>, Category = <code>WF-Step</code>, Output Variable Name = <code>tweet_text</code></li>
+        </ul>
+    </li>
+    <li><b>Define Workflow:</b>
+        <ul>
+            <li>Go to <span class="ui-element">Workflows</span> tab, click <span class="ui-element">New</span>, name it "Science Tweet".</li>
+            <li>Go to <span class="ui-element">Prompts</span> tab, select Prompt 1.</li>
+            <li>Go to <span class="ui-element">Workflows</span> tab, click <span class="ui-element">Add Prompt as Step</span>.</li>
+            <li>Go to <span class="ui-element">Prompts</span> tab, select Prompt 2.</li>
+            <li>Go to <span class="ui-element">Workflows</span> tab, click <span class="ui-element">Add Prompt as Step</span>.</li>
+            <li>The steps list should show Prompt 1 (outputting `{science_topic}`) then Prompt 2.</li>
+        </ul>
+    </li>
+    <li><b>Run Workflow:</b>
+        <ul>
+            <li>Ensure "Science Tweet" is selected. Select your desired LLM <span class="ui-element">Model</span>.</li>
+            <li>Click <span class="ui-element">Run Workflow</span>.</li>
+            <li>(No initial input dialog should appear, as the first step has no input variables).</li>
+            <li>The <span class="ui-element">Workflow Log</span> will show "Starting Step 1...", then "Step 1 Finished. Output Variable: {science_topic}", then "Starting Step 2...", then "Step 2 Finished. Output Variable: {tweet_text}".</li>
+            <li>The final generated tweet will appear in the main <span class="ui-element">Generated Output</span> area.</li>
+        </ul>
+    </li>
+</ol>
+
+<hr/>
+
+<h3>Tips & Troubleshooting</h3>
+<ul>
+    <li><b>LM Studio Connection:** Ensure LM Studio is running and the API server is started *before* running NovaPrompt Lab or using the <span class="ui-element">Refresh</span> button. Verify the API URL (usually `http://localhost:1234/v1`).</li>
+    <li><b>Model Loading:** Models must be fully loaded in LM Studio before they appear in the <span class="ui-element">Model</span> dropdown after clicking <span class="ui-element">Refresh</span>.</li>
+    <li><b>Concise Output:** The app automatically adds instructions to prompts sent to the AI to minimize conversational filler. If you still get unwanted introductions, try making your core prompt instructions even more direct.</li>
+    <li><b>Workflow Errors:** If a workflow fails, check the <span class="ui-element">Workflow Log</span>. Common issues include missing initial inputs or mismatches between an `Output Variable Name` in one step and the <span class="variable">{variable_name}</span> used in the next. Variable names are case-sensitive!</li>
+    <li><b>Variable UI:** If the <span class="ui-element">Prompt Variables</span> section doesn't update correctly after pasting text, try adding or deleting a character in the editor to re-trigger the detection.</li>
+</ul>
+
+</body>
+</html>
